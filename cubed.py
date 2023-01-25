@@ -24,7 +24,6 @@ def fetch_art(file: str) -> None:
 @app.route("/upload", methods = ["POST"])
 def upload_file() -> None:
     if "thumb" not in request.files:
-        print(request.files)
         return abort(400)
 
     # Fetch request information

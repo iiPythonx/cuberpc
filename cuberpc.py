@@ -77,21 +77,19 @@ def on_message(ws: websocket.WebSocketApp, m: Any):
         return
 
     log("debug", m)
-    metadata, extras = m["options"]["playing_track"], {}
+    metadata = m["options"]["playing_track"]
     if m["options"]["state"] not in ["paused", "playing"]:
         return rpc.clear()
 
-    elif metadata["playing_current_time"] < .1:
-        t = time.time()
-        extras = {"start": t, "end": t + metadata["playing_duration"]}
-
+    t = time.time()
     album_link = get_album_art_link(metadata["artist"], metadata["album"], metadata["thumbnail_id"])
     rpc.update(
         details = metadata["title"],
         state = f"{metadata['artist']} - {metadata['album']}",
         large_image = album_link,
         large_text = metadata["album"],
-        **extras
+        start = t,
+        end = t + (m["options"]["playing_duration"] - m["options"]["playing_current_time"])
     )
 
 def on_error(ws: websocket.WebSocketApp, m: Any):
