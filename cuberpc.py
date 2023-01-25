@@ -5,6 +5,8 @@ import os
 import rel
 import json
 import websocket
+from typing import Any
+from datetime import datetime
 
 # Load configuration
 config_files, config = [
@@ -22,22 +24,39 @@ for file in config_files:
     except Exception:
         pass
 
-def on_message(ws, message):
-    print(message)
+# Initialization
+def log(state: str, message: str) -> None:
+    time = datetime.now().strftime("%D %I:%M:%S %p")
+    print(f"[{state.upper()} {time}]: {message}")
 
-def on_error(ws, message):
-    print(message)
+# Callbacks
+def on_message(ws: websocket.WebSocketApp, m: Any):
+    if m["name"] != "playback_overview_changed":
+        return
 
-def on_close(ws, close_status_code, close_msg):
-    print("### closed ###")
+    log("debug", m)
+
+def on_error(ws: websocket.WebSocketApp, m: Any):
+    log("error", m)
+
+def on_close(ws: websocket.WebSocketApp, ec: int, m: Any):
+    log("warn", f"MusikCube closed connection with status code {ec}; message: '{m}'")
 
 def on_open(ws):
-    print("Opened connection")
-    ws.send({"name": "authenticate", "type": "request", "id": "IUuishdfiuG", "device_id": "cuberpc", "options": {"password": None}})
+    ws.send({
+        "name": "authenticate",
+        "type": "request",
+        "id": "cuberpc",
+        "device_id": "cuberpc",
+        "options": {"password": config.get("password")}
+    })
 
+# CubeRPC Connection
 if __name__ == "__main__":
+
+    # Connect to Musikcube
     ws = websocket.WebSocketApp(
-        "ws://localhost:7905",
+        f"ws://localhost:{config.get('port', 7905)}",
         on_open = on_open,
         on_message = on_message,
         on_error = on_error,
