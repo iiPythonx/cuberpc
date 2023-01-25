@@ -7,6 +7,7 @@ import json
 import websocket
 from typing import Any
 from datetime import datetime
+from pypresence import Presence
 
 # Load configuration
 config_files, config = [
@@ -29,12 +30,40 @@ def log(state: str, message: str) -> None:
     time = datetime.now().strftime("%D %I:%M:%S %p")
     print(f"[{state.upper()} {time}]: {message}")
 
+log("info", "Connecting to discord RPC!")
+try:
+    rpc = Presence(config["client_id"], pipe = config.get("pipe", 0))
+    rpc.connect()
+
+except IndexError:
+    log("error", "Configuration file requires a discord app client ID!")
+    exit(1)
+
+except Exception as m:
+    log("error", m)
+    exit(1)
+
 # Callbacks
 def on_message(ws: websocket.WebSocketApp, m: Any):
+    m = json.loads(m)
     if m["name"] != "playback_overview_changed":
         return
 
     log("debug", m)
+    metadata = m["options"]["playing_track"]
+    if m["options"]["state"] == "paused":
+        pass
+
+    elif m["options"]["state"] == "playing":
+        pass
+
+    else:
+        log("error", f"Unknown state '{m['options']['state']}'!")
+
+    rpc.update(
+        details = metadata["title"],
+        state = f"{metadata['artist']} - {metadata['album']}"
+    )
 
 def on_error(ws: websocket.WebSocketApp, m: Any):
     log("error", m)
