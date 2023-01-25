@@ -3,9 +3,11 @@
 # Modules
 import os
 import rel
+import time
 import json
 import websocket
 from typing import Any
+from requests import post
 from datetime import datetime
 from pypresence import Presence
 
@@ -25,10 +27,35 @@ for file in config_files:
     except Exception:
         pass
 
+# Sane defaults
+mcd = config.get("musikcube_dir", "$HOME/.config/musikcube").replace("$HOME", os.path.expanduser("~"))
+albumartserver = config.get("albumserve", "albumart.iipython.cf")
+
 # Initialization
+album_cache = {}
+mcalbumart = os.path.join(mcd, "1/thumbs")
+
 def log(state: str, message: str) -> None:
     time = datetime.now().strftime("%D %I:%M:%S %p")
     print(f"[{state.upper()} {time}]: {message}")
+
+def get_album_art_link(author: str, album: str, thumb_id: int) -> str:
+    if thumb_id in album_cache:
+        return album_cache[thumb_id]
+
+    result = "unknown"
+    thumb_file = os.path.join(mcalbumart, str(thumb_id) + ".jpg")
+    if os.path.isfile(thumb_file):
+        try:
+            result = post(
+                f"http://{albumartserver}/upload",
+                data = {"id": f"{author} - {album}.jpg"},
+                files = {"thumb": open(thumb_file, "rb")}).text
+
+        except Exception:
+            pass
+
+    return result
 
 log("info", "Connecting to discord RPC!")
 try:
@@ -50,19 +77,21 @@ def on_message(ws: websocket.WebSocketApp, m: Any):
         return
 
     log("debug", m)
-    metadata = m["options"]["playing_track"]
-    if m["options"]["state"] == "paused":
-        pass
+    metadata, extras = m["options"]["playing_track"], {}
+    if m["options"]["state"] not in ["paused", "playing"]:
+        return rpc.clear()
 
-    elif m["options"]["state"] == "playing":
-        pass
+    elif metadata["playing_current_time"] < .1:
+        t = time.time()
+        extras = {"start": t, "end": t + metadata["playing_duration"]}
 
-    else:
-        log("error", f"Unknown state '{m['options']['state']}'!")
-
+    album_link = get_album_art_link(metadata["artist"], metadata["album"], metadata["thumbnail_id"])
     rpc.update(
         details = metadata["title"],
-        state = f"{metadata['artist']} - {metadata['album']}"
+        state = f"{metadata['artist']} - {metadata['album']}",
+        large_image = album_link,
+        large_text = metadata["album"],
+        **extras
     )
 
 def on_error(ws: websocket.WebSocketApp, m: Any):

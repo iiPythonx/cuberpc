@@ -1,4 +1,5 @@
 rel
+requests
 pypresence
 websocket-client
 websocket-client[optional]

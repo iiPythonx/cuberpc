@@ -1,5 +1,7 @@
 {
     "port": 7905,
     "password": null,
-    "client_id": 1067662351727329300
+    "albumserve": "localhost:8080",
+    "client_id": 1067662351727329300,
+    "musikcube_dir": "$HOME/.config/musikcube"
 }
