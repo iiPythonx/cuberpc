@@ -5,6 +5,7 @@ import os
 import rel
 import time
 import json
+import random
 import requests
 import websocket
 from typing import Any
@@ -54,7 +55,7 @@ def get_album_art_link(author: str, album: str, thumb_id: int) -> str:
                 f"http://localhost:{musikcube_info.get('streamport', 7906)}/thumbnail/{thumb_id}",
                 auth = ("default", musikcube_info.get("password") or "")
             ).content}
-        ).text
+        ).text + "?" + str(random.randint(1000, 9999))  # Random cache-preventing number
 
     except Exception:
         return "unknown"
@@ -75,23 +76,27 @@ except Exception as m:
 # Callbacks
 def on_message(ws: websocket.WebSocketApp, m: Any):
     m = json.loads(m)
-    log("debug", m)
     if m["name"] != "playback_overview_changed":
         return
 
-    metadata = m["options"]["playing_track"]
+    log("debug", m)
+    metadata, extras, t = m["options"]["playing_track"], {}, time.time()
     if m["options"]["state"] not in ["paused", "playing"]:
         return rpc.clear()
 
-    t = time.time()
+    elif m["options"]["state"] != "paused":
+        extras = {
+            "start": t,
+            "end": t + (m["options"]["playing_duration"] - m["options"]["playing_current_time"])
+        }
+
     album_link = get_album_art_link(metadata["artist"], metadata["album"], metadata["thumbnail_id"])
     rpc.update(
         details = metadata["title"],
         state = f"{metadata['artist']} - {metadata['album']}",
         large_image = album_link,
         large_text = metadata["album"],
-        start = t,
-        end = t + (m["options"]["playing_duration"] - m["options"]["playing_current_time"])
+        **extras
     )
 
 def on_error(ws: websocket.WebSocketApp, m: Any):
