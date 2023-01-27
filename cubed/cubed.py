@@ -120,7 +120,7 @@ async def upload_file(req: web.Request) -> web.Response:
             size += len(chunk)
             f.write(chunk)
 
-    return web.Response(text = f"{base_domain}/a/{fn}")
+    return web.Response(text = f"{base_domain}/a/{ip}/{fn}")
 
 app.add_routes(routes)
 
