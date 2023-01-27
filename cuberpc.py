@@ -50,11 +50,10 @@ def get_album_art_link(author: str, album: str, thumb_id: int) -> str:
     try:
         return requests.post(
             f"{albumartserver}/upload",
-            data = {"id": f"{author} - {album}.jpg"},
-            files = {"thumb": requests.get(
+            files = {"thumb": (f"{author} - {album}.jpg", requests.get(
                 f"http://localhost:{musikcube_info.get('streamport', 7906)}/thumbnail/{thumb_id}",
                 auth = ("default", musikcube_info.get("password") or "")
-            ).content}
+            ).content)}
         ).text + "?" + str(random.randint(1000, 9999))  # Random cache-preventing number
 
     except Exception:
