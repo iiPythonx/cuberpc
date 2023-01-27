@@ -5,9 +5,9 @@ import os
 import rel
 import time
 import json
+import requests
 import websocket
 from typing import Any
-from requests import post
 from datetime import datetime
 from pypresence import Presence
 
@@ -28,12 +28,15 @@ for file in config_files:
         pass
 
 # Sane defaults
-mcd = config.get("musikcube_dir", "$HOME/.config/musikcube").replace("$HOME", os.path.expanduser("~"))
 albumartserver = config.get("albumserve", "albumart.iipython.cf")
+musikcube_info = config.get("musikcube", {
+    "metaport": 7905,
+    "streamport": 7906,
+    "password": None
+})
 
 # Initialization
 album_cache = {}
-mcalbumart = os.path.join(mcd, "1/thumbs")
 
 def log(state: str, message: str) -> None:
     time = datetime.now().strftime("%D %I:%M:%S %p")
@@ -43,19 +46,18 @@ def get_album_art_link(author: str, album: str, thumb_id: int) -> str:
     if thumb_id in album_cache:
         return album_cache[thumb_id]
 
-    result = "unknown"
-    thumb_file = os.path.join(mcalbumart, str(thumb_id) + ".jpg")
-    if os.path.isfile(thumb_file):
-        try:
-            result = post(
-                f"http://{albumartserver}/upload",
-                data = {"id": f"{author} - {album}.jpg"},
-                files = {"thumb": open(thumb_file, "rb")}).text
+    try:
+        return requests.post(
+            f"http://{albumartserver}/upload",
+            data = {"id": f"{author} - {album}.jpg"},
+            files = {"thumb": requests.get(
+                f"http://localhost:{musikcube_info.get('streamport', 7906)}/thumbnail/{thumb_id}",
+                auth = ("default", musikcube_info.get("password") or "")
+            ).content}
+        ).text
 
-        except Exception:
-            pass
-
-    return result
+    except Exception:
+        return "unknown"
 
 log("info", "Connecting to discord RPC!")
 try:
@@ -73,10 +75,10 @@ except Exception as m:
 # Callbacks
 def on_message(ws: websocket.WebSocketApp, m: Any):
     m = json.loads(m)
+    log("debug", m)
     if m["name"] != "playback_overview_changed":
         return
 
-    log("debug", m)
     metadata = m["options"]["playing_track"]
     if m["options"]["state"] not in ["paused", "playing"]:
         return rpc.clear()
@@ -104,7 +106,7 @@ def on_open(ws):
         "type": "request",
         "id": "cuberpc",
         "device_id": "cuberpc",
-        "options": {"password": config.get("password")}
+        "options": {"password": musikcube_info.get("password")}
     })
 
 # CubeRPC Connection
@@ -112,7 +114,7 @@ if __name__ == "__main__":
 
     # Connect to Musikcube
     ws = websocket.WebSocketApp(
-        f"ws://localhost:{config.get('port', 7905)}",
+        f"ws://localhost:{musikcube_info.get('metaport', 7905)}",
         on_open = on_open,
         on_message = on_message,
         on_error = on_error,

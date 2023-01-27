@@ -1,7 +1,9 @@
 {
-    "port": 7905,
-    "password": null,
-    "albumserve": "localhost:8080",
-    "client_id": 1067662351727329300,
-    "musikcube_dir": "$HOME/.config/musikcube"
+    "musikcube": {
+        "metaport": 7905,
+        "streamport": 7906,
+        "password": ""
+    },
+    "albumserve": "https://albumart.iipython.cf",
+    "client_id": 1067662351727329300
 }
