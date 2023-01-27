@@ -4,15 +4,37 @@
 # Modules
 import os
 import re
+import shutil
 from aiohttp import web
 from werkzeug.utils import secure_filename
 
 # Initialization
-app = web.Application()
+app, templates = web.Application(), os.path.join(os.path.dirname(__file__), "templates")
 ip_regex = re.compile(r"[0-9.]*$")
 
 def secure_ip(ip: str) -> str:
     return not (not ip_regex.match(ip) or len(ip) > 15)
+
+def render_html(file: str, *args) -> web.Response:
+    with open(os.path.join(templates, file), "r") as fh:
+        data = fh.read()
+
+    for i, d in enumerate(args):
+        data = data.replace("{{{}}}".format(i), str(d))
+
+    return web.Response(text = data, content_type = "text/html")
+
+def grab_ip(req: web.Request) -> str:
+
+    # Grab a (hopefully) unique IP
+    ip, cfc = req.remote, req.headers.get("CF-Connecting-IP")
+    if cfc is not None:
+        if not secure_ip(cfc):
+            raise web.HTTPBadRequest  # People can mess with headers if we ARENT using CF
+
+        ip = cfc
+
+    return ip
 
 # Settings
 art_folder = os.getenv("CUBED_ALBUMART_FOLDER", "")
@@ -36,11 +58,26 @@ routes = web.RouteTableDef()
 
 @routes.route("*", "/")
 async def route_index(req: web.Request) -> web.Response:
+
+    # Grab info
+    path = os.path.join(art_folder, grab_ip(req))
+    count = len(os.listdir(path)) if os.path.isdir(path) else 0
+
+    # Methods
     if req.method == "POST":
-        return web.Response()
+        if not count:
+            return render_html("none.html")
+
+        try:
+            shutil.rmtree(path)
+            return render_html("success.html")
+
+        except Exception as err:
+            print(err)
+            return render_html("failure.html")
 
     elif req.method == "GET":
-        return web.Response()
+        return render_html("index.html", count)
 
     raise web.HTTPMethodNotAllowed
 
@@ -58,14 +95,7 @@ async def fetch_art(req: web.Request) -> web.Response:
 @routes.post("/upload")
 async def upload_file(req: web.Request) -> web.Response:
     reader = await req.multipart()
-
-    # Grab a (hopefully) unique IP
-    ip, cfc = req.remote, req.headers.get("CF-Connecting-IP")
-    if cfc is not None:
-        if not secure_ip(cfc):
-            raise web.HTTPBadRequest  # People can mess with headers if we ARENT using CF
-
-        ip = cfc
+    ip = grab_ip(req)
 
     # Handle upload
     field = await reader.next()
