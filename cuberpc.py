@@ -48,7 +48,7 @@ def get_album_art_link(author: str, album: str, thumb_id: int) -> str:
 
     try:
         return requests.post(
-            f"http://{albumartserver}/upload",
+            f"{albumartserver}/upload",
             data = {"id": f"{author} - {album}.jpg"},
             files = {"thumb": requests.get(
                 f"http://localhost:{musikcube_info.get('streamport', 7906)}/thumbnail/{thumb_id}",
